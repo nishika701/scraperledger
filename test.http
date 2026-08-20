@@ -1,0 +1,10 @@
+POST http://localhost:8080/api/scrape-events
+Content-Type: application/json
+
+{
+  "repoName": "scrapeledger",
+  "repoUrl": "https://github.com/test/scrapeledger",
+  "openIssues": 12,
+  "openPrs": 4,
+  "lastCommitDate": "2026-08-20"
+}
