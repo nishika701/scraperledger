@@ -9,6 +9,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrapeledger.scrapeledger.scraper.WebScraper;
 
 public class ScrapewatchCli {
 
@@ -25,7 +26,6 @@ public class ScrapewatchCli {
 
         String subcommand = args[0].toLowerCase();
 
-        // check and history require a repo ID
         if ((subcommand.equals("check") || subcommand.equals("history"))
                 && args.length < 2) {
             printUsageAndExit();
@@ -55,7 +55,6 @@ public class ScrapewatchCli {
         }
     }
 
-
     private static void handleCheck(String[] args) {
 
         String repoId = args[1];
@@ -78,20 +77,38 @@ public class ScrapewatchCli {
             System.out.println("         REPOSITORY STATUS");
             System.out.println("=================================");
 
-            System.out.println("Repo:          "
-                    + getText(node, "repoName"));
+            System.out.println(
+                    "Repo:          "
+                            + getText(node, "repoName")
+            );
 
-            System.out.println("Open Issues:   "
-                    + getText(node, "openIssues"));
+            System.out.println(
+                    "Health Score:  "
+                            + getInt(node, "healthScore")
+            );
 
-            System.out.println("Open PRs:      "
-                    + getText(node, "openPrs"));
+            System.out.println("---------------------------------");
 
-            System.out.println("Last Commit:   "
-                    + getText(node, "lastCommitDate"));
+            JsonNode data = node.get("data");
 
-            System.out.println("Health Score:  "
-                    + getInt(node, "healthScore"));
+            if (data != null && data.isObject()) {
+
+                data.fields().forEachRemaining(entry -> {
+
+                    System.out.println(
+                            String.format(
+                                    "%-20s %s",
+                                    entry.getKey() + ":",
+                                    entry.getValue().asText()
+                            )
+                    );
+
+                });
+
+            } else {
+
+                System.out.println("No data available.");
+            }
 
             System.out.println("=================================");
             System.out.println();
@@ -99,11 +116,11 @@ public class ScrapewatchCli {
         } catch (Exception e) {
 
             System.out.println(
-                    "Error fetching repo state: " + e.getMessage()
+                    "Error fetching repo state: "
+                            + e.getMessage()
             );
         }
     }
-
 
     private static void handleHistory(String[] args) {
 
@@ -122,7 +139,10 @@ public class ScrapewatchCli {
             System.out.println("          REPOSITORY HISTORY");
             System.out.println("=================================");
 
-            if (events == null || !events.isArray() || events.isEmpty()) {
+            if (events == null
+                    || !events.isArray()
+                    || events.isEmpty()) {
+
                 System.out.println("No history available.");
                 return;
             }
@@ -131,24 +151,29 @@ public class ScrapewatchCli {
 
                 String field = getText(event, "field");
 
-                String oldVal = event.get("oldValue") == null
-                        || event.get("oldValue").isNull()
-                        ? "null"
-                        : event.get("oldValue").asText();
+                String oldVal =
+                        event.get("oldValue") == null
+                                || event.get("oldValue").isNull()
+                                ? "null"
+                                : event.get("oldValue").asText();
 
-                String newVal = event.get("newValue") == null
-                        || event.get("newValue").isNull()
-                        ? "null"
-                        : event.get("newValue").asText();
+                String newVal =
+                        event.get("newValue") == null
+                                || event.get("newValue").isNull()
+                                ? "null"
+                                : event.get("newValue").asText();
 
-                String scrapedAt = getText(event, "scrapedAt");
+                String scrapedAt =
+                        getText(event, "scrapedAt");
 
-                boolean anomaly = event.has("anomaly")
-                        && event.get("anomaly").asBoolean();
+                boolean anomaly =
+                        event.has("isAnomaly")
+                                && event.get("isAnomaly").asBoolean();
 
-                String flag = anomaly
-                        ? "  [ANOMALY]"
-                        : "";
+                String flag =
+                        anomaly
+                                ? "  [ANOMALY]"
+                                : "";
 
                 System.out.println(
                         "[" + scrapedAt + "] "
@@ -166,7 +191,8 @@ public class ScrapewatchCli {
         } catch (Exception e) {
 
             System.out.println(
-                    "Error fetching history: " + e.getMessage()
+                    "Error fetching history: "
+                            + e.getMessage()
             );
         }
     }
@@ -175,15 +201,18 @@ public class ScrapewatchCli {
 
         try {
 
-            // First get ALL tracked repositories
             String json = fetch(BASE_URL + "/repos");
 
             JsonNode repos = MAPPER.readTree(json);
 
-            if (repos == null || !repos.isArray() || repos.isEmpty()) {
+            if (repos == null
+                    || !repos.isArray()
+                    || repos.isEmpty()) {
 
                 System.out.println();
-                System.out.println("No repositories are currently tracked.");
+                System.out.println(
+                        "No repositories are currently tracked."
+                );
                 System.out.println();
 
                 return;
@@ -194,36 +223,44 @@ public class ScrapewatchCli {
             System.out.println("       SCRAPEWATCH STATUS");
             System.out.println("=================================");
 
-            // Dynamically loop through every repository
             for (JsonNode repo : repos) {
 
                 long id = repo.get("id").asLong();
 
-                String name = repo.has("name")
-                        ? repo.get("name").asText()
-                        : "Unknown repository";
+                String name =
+                        repo.has("name")
+                                ? repo.get("name").asText()
+                                : "Unknown repository";
 
                 try {
 
                     String currentJson = fetch(
-                            BASE_URL + "/repos/" + id + "/current"
+                            BASE_URL
+                                    + "/repos/"
+                                    + id
+                                    + "/current"
                     );
 
-                    JsonNode current = MAPPER.readTree(currentJson);
+                    JsonNode current =
+                            MAPPER.readTree(currentJson);
 
-                    int healthScore = getInt(
-                            current,
-                            "healthScore"
-                    );
+                    int healthScore =
+                            getInt(
+                                    current,
+                                    "healthScore"
+                            );
 
                     System.out.println(
-                            name + " — Health: " + healthScore
+                            name
+                                    + " — Health: "
+                                    + healthScore
                     );
 
                 } catch (Exception e) {
 
                     System.out.println(
-                            name + " — unavailable"
+                            name
+                                    + " — unavailable"
                     );
                 }
             }
@@ -239,55 +276,61 @@ public class ScrapewatchCli {
             );
         }
     }
+
     private static void handleAdd(String[] args) {
-        if (args.length < 6) {
+
+        if (args.length < 3) {
 
             System.out.println(
-                    "Usage:"
-            );
-
-            System.out.println(
-                    "scrapewatch add <repoName> <githubUrl> "
-                            + "<openIssues> <openPrs> <lastCommitDate>"
+                    "Usage: scrapewatch add <repoName> <repoUrl>"
             );
 
             return;
         }
 
         String repoName = args[1];
-        String githubUrl = args[2];
-
-        int openIssues;
-        int openPrs;
+        String repoUrl = args[2];
 
         try {
 
-            openIssues = Integer.parseInt(args[3]);
-            openPrs = Integer.parseInt(args[4]);
+            /*
+             * Create scraper.
+             */
+            WebScraper scraper = new WebScraper();
 
-        } catch (NumberFormatException e) {
+            /*
+             * ACTUALLY SCRAPE THE PROVIDED URL.
+             *
+             * No hardcoded test data.
+             */
+            Map<String, String> data =
+                    scraper.scrape(repoUrl);
 
-            System.out.println(
-                    "openIssues and openPrs must be numbers."
-            );
+            if (data == null || data.isEmpty()) {
 
-            return;
-        }
+                System.out.println(
+                        "No data was scraped from the URL."
+                );
 
-        String lastCommitDate = args[5];
+                return;
+            }
 
-        try {
-            Map<String, Object> payload = new HashMap<>();
+            /*
+             * Create request payload.
+             */
+            Map<String, Object> payload =
+                    new HashMap<>();
 
             payload.put("repoName", repoName);
-            payload.put("repoUrl", githubUrl);
-            payload.put("openIssues", openIssues);
-            payload.put("openPrs", openPrs);
-            payload.put("lastCommitDate", lastCommitDate);
+            payload.put("repoUrl", repoUrl);
+            payload.put("data", data);
 
             String jsonPayload =
                     MAPPER.writeValueAsString(payload);
 
+            /*
+             * Send scraped data to Spring Boot.
+             */
             HttpRequest request =
                     HttpRequest.newBuilder()
                             .uri(
@@ -309,14 +352,22 @@ public class ScrapewatchCli {
             HttpResponse<String> response =
                     CLIENT.send(
                             request,
-                            HttpResponse.BodyHandlers.ofString()
+                            HttpResponse.BodyHandlers
+                                    .ofString()
                     );
+
             if (response.statusCode() >= 200
                     && response.statusCode() < 300) {
 
                 System.out.println();
                 System.out.println(
-                        "Repository registered successfully!"
+                        "================================="
+                );
+                System.out.println(
+                        "      SCRAPE SUCCESSFUL"
+                );
+                System.out.println(
+                        "================================="
                 );
 
                 System.out.println(
@@ -324,9 +375,27 @@ public class ScrapewatchCli {
                 );
 
                 System.out.println(
-                        "URL:  " + githubUrl
+                        "URL:  " + repoUrl
                 );
 
+                System.out.println();
+                System.out.println(
+                        "Scraped data:"
+                );
+
+                data.forEach(
+                        (key, value) ->
+                                System.out.println(
+                                        "  "
+                                                + key
+                                                + ": "
+                                                + value
+                                )
+                );
+
+                System.out.println(
+                        "================================="
+                );
                 System.out.println();
 
             } else {
@@ -345,17 +414,19 @@ public class ScrapewatchCli {
                                 + response.body()
                 );
             }
-
         } catch (Exception e) {
 
-            System.out.println(
-                    "Error adding repo: "
-                            + e.getMessage()
-            );
-        }
+        System.out.println(
+                "Error scraping/adding repo: "
+                        + e
+        );
+
+        e.printStackTrace();
+    }
     }
 
-    private static String fetch(String url) throws Exception {
+    private static String fetch(String url)
+            throws Exception {
 
         HttpRequest request =
                 HttpRequest.newBuilder()
@@ -366,7 +437,8 @@ public class ScrapewatchCli {
         HttpResponse<String> response =
                 CLIENT.send(
                         request,
-                        HttpResponse.BodyHandlers.ofString()
+                        HttpResponse.BodyHandlers
+                                .ofString()
                 );
 
         if (response.statusCode() < 200
@@ -382,8 +454,7 @@ public class ScrapewatchCli {
 
     private static String getText(
             JsonNode node,
-            String field
-    ) {
+            String field) {
 
         if (node == null
                 || !node.has(field)
@@ -397,8 +468,7 @@ public class ScrapewatchCli {
 
     private static int getInt(
             JsonNode node,
-            String field
-    ) {
+            String field) {
 
         if (node == null
                 || !node.has(field)
@@ -416,8 +486,10 @@ public class ScrapewatchCli {
         System.out.println("ScrapeWatch CLI");
         System.out.println();
 
+        System.out.println("Usage:");
+
         System.out.println(
-                "Usage:"
+                "  scrapewatch add <repoName> <repoUrl>"
         );
 
         System.out.println(
@@ -430,11 +502,6 @@ public class ScrapewatchCli {
 
         System.out.println(
                 "  scrapewatch status"
-        );
-
-        System.out.println(
-                "  scrapewatch add <repoName> <githubUrl> "
-                        + "<openIssues> <openPrs> <lastCommitDate>"
         );
 
         System.out.println();

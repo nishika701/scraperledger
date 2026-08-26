@@ -7,7 +7,9 @@ import com.scrapeledger.scrapeledger.repository.RepoEventRepository;
 import com.scrapeledger.scrapeledger.repository.RepoRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ProjectionService {
@@ -15,46 +17,75 @@ public class ProjectionService {
     private final RepoRepository repoRepository;
     private final RepoEventRepository repoEventRepository;
 
-    public ProjectionService(RepoRepository repoRepository, RepoEventRepository repoEventRepository) {
+    public ProjectionService(
+            RepoRepository repoRepository,
+            RepoEventRepository repoEventRepository) {
+
         this.repoRepository = repoRepository;
         this.repoEventRepository = repoEventRepository;
     }
 
     public RepoStateDto getCurrentState(Long repoId) {
+
         Repo repo = repoRepository.findById(repoId)
-                .orElseThrow(() -> new RuntimeException("Repo not found: " + repoId));
+                .orElseThrow(() ->
+                        new RuntimeException("Repo not found: " + repoId)
+                );
 
-        String openIssues = latestValue(repoId, "open_issues");
-        String openPrs = latestValue(repoId, "open_prs");
-        String lastCommitDate = latestValue(repoId, "last_commit_date");
+        List<RepoEvent> events =
+                repoEventRepository.findByRepoIdOrderByScrapedAtAsc(repoId);
 
-        int healthScore = computeHealthScore(openIssues);
+        Map<String, String> currentData = new LinkedHashMap<>();
 
-        return new RepoStateDto(repo.getId(), repo.getName(), openIssues, openPrs, lastCommitDate, healthScore);
+        for (RepoEvent event : events) {
+            currentData.put(
+                    event.getField(),
+                    event.getNewValue()
+            );
+        }
+
+        int healthScore = computeHealthScore(currentData);
+
+        return new RepoStateDto(
+                repo.getId(),
+                repo.getName(),
+                currentData,
+                healthScore
+        );
     }
 
     public List<RepoEvent> getHistory(Long repoId) {
-        return repoEventRepository.findByRepoIdOrderByScrapedAtAsc(repoId);
+
+        return repoEventRepository
+                .findByRepoIdOrderByScrapedAtAsc(repoId);
     }
 
     public List<RepoEvent> getAnomalies(Long repoId) {
-        return repoEventRepository.findByRepoIdAndIsAnomalyTrueOrderByScrapedAtAsc(repoId);
+
+        return repoEventRepository
+                .findByRepoIdAndIsAnomalyTrueOrderByScrapedAtAsc(repoId);
     }
 
-    private String latestValue(Long repoId, String field) {
-        RepoEvent event = repoEventRepository.findFirstByRepoIdAndFieldOrderByScrapedAtDesc(repoId, field);
-        return event == null ? null : event.getNewValue();
-    }
+    private int computeHealthScore(Map<String, String> data) {
 
-    // Simple formula: start at 100, subtract 1 point per open issue, floor at 0.
-    // Explainable in one sentence for the demo — that's the point.
-    private int computeHealthScore(String openIssuesStr) {
-        if (openIssuesStr == null) return 0;
-        try {
-            int issues = Integer.parseInt(openIssuesStr);
-            return Math.max(0, 100 - issues);
-        } catch (NumberFormatException e) {
+        if (data == null || data.isEmpty()) {
             return 0;
         }
+
+        int score = 100;
+
+        if (!data.containsKey("version")) {
+            score -= 25;
+        }
+
+        if (!data.containsKey("release_date")) {
+            score -= 25;
+        }
+
+        if (!data.containsKey("summary")) {
+            score -= 25;
+        }
+
+        return Math.max(0, score);
     }
 }
