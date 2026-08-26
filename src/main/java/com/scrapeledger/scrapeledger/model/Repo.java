@@ -19,14 +19,14 @@ public class Repo {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(name = "github_url", nullable = false)
-    private String githubUrl;
+    @Column(name = "source_url", nullable = false)
+    private String sourceUrl;
 
     @Column(name = "created_At")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public Repo(String name, String githubUrl) {
+    public Repo(String name, String sourceUrl) {
         this.name = name;
-        this.githubUrl = githubUrl;
+        this.sourceUrl = sourceUrl;
     }
 }

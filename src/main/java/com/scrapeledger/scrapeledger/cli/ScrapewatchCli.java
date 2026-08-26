@@ -252,7 +252,7 @@ public class ScrapewatchCli {
 
                     System.out.println(
                             name
-                                    + " — Health: "
+                                    + " - Health: "
                                     + healthScore
                     );
 
@@ -260,7 +260,7 @@ public class ScrapewatchCli {
 
                     System.out.println(
                             name
-                                    + " — unavailable"
+                                    + " - unavailable"
                     );
                 }
             }
